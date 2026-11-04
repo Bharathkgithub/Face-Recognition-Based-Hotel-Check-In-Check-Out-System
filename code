@@ -1,0 +1,116 @@
+
+import cv2
+import face_recognition
+import os
+
+# Get the folder where main.py is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+known_face_encodings = []
+known_face_names = []
+
+# Store image filenames and corresponding names
+known_people = [
+    ("messi.jpeg", "messi"),
+    ("Narendra Modi.jpeg", "Narendra Modi"),
+    ("appu pic.jpeg", "bharath"),
+    ("Pramoth K.jpeg", "Pramoth K"),
+    ("S Kumaran.jpeg", "S Kumaran"),
+    ("S vijayalakshmi.jpeg", "S vijayalakshmi")
+]
+
+# Load images and generate face encodings
+for filename, name in known_people:
+
+    image_path = os.path.join(BASE_DIR, filename)
+
+    if not os.path.exists(image_path):
+        print(f"Image not found: {image_path}")
+        continue
+
+    image = face_recognition.load_image_file(image_path)
+
+    encodings = face_recognition.face_encodings(image)
+
+    if len(encodings) == 0:
+        print(f"No face detected in {filename}")
+        continue
+
+    known_face_encodings.append(encodings[0])
+    known_face_names.append(name)
+
+print("Known faces loaded:", known_face_names)
+
+# Start webcam
+video_capture = cv2.VideoCapture(0)
+
+if not video_capture.isOpened():
+    print("Error: Webcam not detected!")
+    exit()
+
+while True:
+
+    ret, frame = video_capture.read()
+
+    if not ret:
+        print("Failed to capture video")
+        break
+
+    # Convert BGR to RGB
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    # Detect faces
+    face_locations = face_recognition.face_locations(rgb_frame)
+
+    # Generate face encodings
+    face_encodings = face_recognition.face_encodings(
+        rgb_frame, face_locations
+    )
+
+    for (top, right, bottom, left), face_encoding in zip(
+        face_locations, face_encodings
+    ):
+
+        # Compare detected face with known faces
+        face_distances = face_recognition.face_distance(
+            known_face_encodings, face_encoding
+        )
+
+        name = "unknown_person"
+
+        if len(face_distances) > 0:
+
+            best_match_index = face_distances.argmin()
+
+            if face_distances[best_match_index] < 0.6:
+                name = known_face_names[best_match_index]
+
+        # Draw rectangle
+        cv2.rectangle(
+            frame,
+            (left, top),
+            (right, bottom),
+            (0, 0, 255),
+            2
+        )
+
+        # Display name
+        cv2.putText(
+            frame,
+            name,
+            (left, top - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (0, 0, 255),
+            2
+        )
+
+    cv2.imshow("Face Recognition System", frame)
+
+    # Press Q to exit
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release resources
+video_capture.release()
+cv2.destroyAllWindows()
